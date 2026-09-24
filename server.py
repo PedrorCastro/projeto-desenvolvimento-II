@@ -237,4 +237,4 @@ def run(host: str = "127.0.0.1", port: int = 8000) -> None:
 
 
 if __name__ == "__main__":
-    run(host=os.environ.get("METEO_HOST", "127.0.0.1"), port=int(os.environ.get("METEO_PORT", "8000")))
+    run(host=os.environ.get("METEO_HOST", "0.0.0.0"), port=int(os.environ.get("METEO_PORT", "8000")))
