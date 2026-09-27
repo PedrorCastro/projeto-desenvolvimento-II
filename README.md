@@ -8,12 +8,20 @@ A API está publicada em produção via **Render** e recebendo medições reais 
 
 ---
 
-## Como executar localmente
+## Estrutura do projeto
 
-No PowerShell, dentro desta pasta:
+```text
+back/api       API Python, SQLite e testes
+back/firmware  código do ESP32
+front          dashboard web React/Vite
+```
+
+## Como executar a API localmente
+
+No PowerShell, dentro de `back/api`:
 
 ```powershell
-python server.py
+    python server.py
 ```
 
 O serviço ficará disponível em `http://127.0.0.1:8000`. O arquivo `meteo.db` será criado automaticamente.
@@ -117,10 +125,34 @@ void enviarMedicao() {
 
 ---
 
+## Como executar o dashboard
+
+No PowerShell, dentro de `front`:
+
+    npm install
+    npm run dev
+
+Por padrão, o dashboard consome a API publicada no Render. Para usar uma API local, crie um arquivo `front/.env` com:
+
+    VITE_API_URL=http://127.0.0.1:8000
+
+O dashboard apresenta as leituras atuais, gráficos de temperatura e umidade, histórico recente, status da estação e estados de erro/carregamento.
+
+## Publicação no Render
+
+O arquivo `render.yaml` deixa os dois serviços configurados no mesmo Blueprint:
+
+- `meteo-api`: Web Service Python, com raiz em `back/api`.
+- `meteo-dashboard`: Static Site, com raiz em `front` e publicação de `dist`.
+
+No Render, use **New > Blueprint**, conecte este repositório e selecione a branch `main`. O Render lerá o `render.yaml`, criará os dois serviços e fará novos deploys a cada push nessa branch. Depois do primeiro deploy, confirme a URL final da API e atualize `VITE_API_URL` no serviço do dashboard caso o nome gerado seja diferente.
+
 ## Testes
 
+Dentro de `back/api`:
+
 ```powershell
-python -m unittest -v
+    python -m unittest -v
 ```
 
 ---

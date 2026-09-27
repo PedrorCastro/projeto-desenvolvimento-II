@@ -225,3 +225,6 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+render_guide/
+relatorio_assets/
+front/node_modules/
