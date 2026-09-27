@@ -1,77 +1,80 @@
-# API Meteorológica - MeteoCidade
+# MeteoCidade
 
-API em Python para receber dados enviados pelo ESP32, validá-los e armazená-los em SQLite. Ela atende à etapa de **backend** do PD-II (estação meteorológica inteligente para monitoramento ambiental urbano) e já permite que o dashboard consuma dados reais.
+### Sistema meteorológico para monitoramento ambiental urbano
 
-A API está publicada em produção via **Render** e recebendo medições reais de um ESP32-S3 simulado no **Cirkit Designer**.
+O **MeteoCidade** é o projeto desenvolvido no **Projeto Desenvolvimento II** para coletar, validar, armazenar e apresentar dados ambientais de uma estação meteorológica.
 
-🔗 **URL pública:** `https://projeto-desenvolvimento-ii.onrender.com`
+```text
+ESP32 / sensores  →  API Python  →  SQLite  →  Dashboard React
+       coleta          validação       dados       visualização
+```
 
----
+| Componente | Tecnologia | Situação |
+|---|---|---|
+| Estação | ESP32-S3 / C++ | Validada em simulação |
+| Backend | Python + HTTP + SQLite | Publicado no Render |
+| Frontend | React + Vite | Dashboard implementado |
+| Deploy | Render | API online e frontend preparado |
+
+## Acesso rápido
+
+- **API em produção:** [projeto-desenvolvimento-ii.onrender.com](https://projeto-desenvolvimento-ii.onrender.com)
+- **Health check:** [/health](https://projeto-desenvolvimento-ii.onrender.com/health)
+- **Branch de desenvolvimento:** `codex/organizar-dashboard`
+
+## Dashboard
+
+O dashboard apresenta a leitura mais recente da estação e o histórico de medições em uma interface responsiva.
+
+- Temperatura, umidade e pressão atmosférica.
+- Qualidade do ar, luminosidade e chuva acumulada.
+- Gráficos de tendência de temperatura e umidade.
+- Tabela de leituras recentes.
+- Status da estação e horário da última sincronização.
+- Atualização automática a cada 30 segundos.
+- Estados de carregamento, erro e API indisponível.
+
+O frontend não possui uma tela separada de estações neste momento. O foco atual é a estação do campus e a visualização clara dos seus dados.
 
 ## Estrutura do projeto
 
 ```text
-back/api       API Python, SQLite e testes
-back/firmware  código do ESP32
-front          dashboard web React/Vite
+projeto-desenvolvimento-II/
+├── back/
+│   ├── api/
+│   │   ├── server.py
+│   │   ├── requirements.txt
+│   │   └── test_server.py
+│   └── firmware/
+│       └── ESP32.cpp
+├── front/
+│   ├── src/
+│   │   ├── main.jsx
+│   │   └── styles.css
+│   ├── index.html
+│   ├── package.json
+│   └── vite.config.js
+├── render.yaml
+└── README.md
 ```
 
-## Como executar a API localmente
-
-No PowerShell, dentro de `back/api`:
-
-```powershell
-    python server.py
-```
-
-O serviço ficará disponível em `http://127.0.0.1:8000`. O arquivo `meteo.db` será criado automaticamente.
-
-Para permitir acesso pela rede local (por exemplo, por um ESP32 conectado no mesmo Wi-Fi), defina o host antes de iniciar:
-
-```powershell
-$env:METEO_HOST = "0.0.0.0"
-python server.py
-```
-
-A API também lê a variável de ambiente `PORT` (usada automaticamente pelo Render em produção), com fallback para `METEO_PORT` e depois `8000`.
-
----
-
-## Deploy em produção (Render)
-
-O serviço está hospedado como **Web Service** no [Render](https://render.com), free tier, conectado diretamente ao repositório GitHub.
-
-| Configuração | Valor |
-|---|---|
-| Build Command | `pip install -r requirements.txt` |
-| Start Command | `python3 server.py` |
-| Runtime | Python 3 |
-
-**Limitações do plano free (importantes para o relatório):**
-- **Disco efêmero**: o arquivo `meteo.db` é recriado do zero a cada redeploy ou reinício do serviço. Os dados não persistem entre reinicializações — adequado para testes de integração, não para armazenamento definitivo. Para persistência real, é necessário um Render Disk (pago) ou migrar para um banco gerenciado (ex.: PostgreSQL).
-- **Cold start**: após ~15 minutos de inatividade, o serviço "dorme". A primeira requisição seguinte pode levar 30-50 segundos para responder; as próximas voltam ao normal.
-
----
-
-## Endpoints
+## API
 
 | Método | Rota | Uso |
 |---|---|---|
-| GET | `/health` | Verifica se a API está disponível. |
-| POST | `/api/v1/measurements` | Registra uma medição do ESP32. |
-| GET | `/api/v1/measurements?station_id=campus-centro-01&limit=50` | Lista medições, da mais recente para a mais antiga. |
-| GET | `/api/v1/stations/campus-centro-01/latest` | Retorna a leitura mais recente da estação. |
-| GET | `/api/v1/stations` | Lista estações e quantidade de registros. |
+| `GET` | `/health` | Verifica a disponibilidade da API |
+| `POST` | `/api/v1/measurements` | Registra uma medição do ESP32 |
+| `GET` | `/api/v1/measurements?station_id=esp32-campus-01&limit=50` | Lista medições recentes |
+| `GET` | `/api/v1/stations/esp32-campus-01/latest` | Retorna a última medição |
+| `GET` | `/api/v1/stations` | Lista estações e quantidade de registros |
 
----
+Os campos obrigatórios de uma medição são `station_id`, `temperature_c`, `humidity_pct` e `pressure_hpa`. Os demais sensores são opcionais. A API valida faixas físicas, datas ISO 8601 e converte os horários para UTC.
 
-## Exemplo de envio do ESP32
-
-Faça uma requisição `POST` com cabeçalho `Content-Type: application/json` para `/api/v1/measurements`.
+### Exemplo de medição
 
 ```json
 {
-  "station_id": "campus-centro-01",
+  "station_id": "esp32-campus-01",
   "temperature_c": 25.4,
   "humidity_pct": 64.2,
   "pressure_hpa": 1012.8,
@@ -84,105 +87,123 @@ Faça uma requisição `POST` com cabeçalho `Content-Type: application/json` pa
 }
 ```
 
-Os campos obrigatórios são `station_id`, `temperature_c`, `humidity_pct` e `pressure_hpa`. Os demais podem ser enviados quando o sensor estiver conectado. A API recusa leituras fisicamente improváveis, como umidade acima de 100%, e armazena as datas em UTC.
+## Como executar localmente
 
----
+### API
 
-## Integração com ESP32 (validada em simulação)
+No PowerShell, dentro de `back/api`:
 
-A comunicação ESP32 → API foi validada usando o simulador **ESP32-S3 do Cirkit Designer**, conectado à rede virtual `CirkitWifi` (aberta, sem senha), com requisições HTTPS via `WiFiClientSecure` apontando para a URL pública do Render.
-
-Trecho essencial do firmware (Arduino/C++):
-
-```cpp
-#include <WiFi.h>
-#include <HTTPClient.h>
-#include <WiFiClientSecure.h>
-
-const char* WIFI_SSID = "CirkitWifi";
-const char* WIFI_PASSWORD = "";
-const char* API_URL = "https://projeto-desenvolvimento-ii.onrender.com/api/v1/measurements";
-
-void enviarMedicao() {
-    WiFiClientSecure client;
-    client.setInsecure();
-
-    HTTPClient http;
-    http.setConnectTimeout(15000); // cobre o cold start do Render
-    http.setTimeout(15000);
-    http.begin(client, API_URL);
-    http.addHeader("Content-Type", "application/json");
-
-    // monta o JSON com as leituras dos sensores e faz o POST
-    int httpCode = http.POST(json);
-    http.end();
-}
+```powershell
+python server.py
 ```
 
-**Teste realizado com sucesso:** `HTTP Status: 201`, medição registrada no banco (`id: 1`).
+A API ficará disponível em `http://127.0.0.1:8000`. O banco `meteo.db` será criado automaticamente.
 
-> ⚠️ Em hardware físico (fora do simulador), o ESP32 se conecta normalmente à rede Wi-Fi real e pode usar tanto a URL do Render quanto um IP local (ex. `192.168.0.x`), sem necessidade de HTTPS/`WiFiClientSecure`, se preferir rodar a API localmente em vez de na nuvem.
+Para permitir acesso pela rede local:
 
----
+```powershell
+$env:METEO_HOST = "0.0.0.0"
+python server.py
+```
 
-## Como executar o dashboard
+### Dashboard
 
 No PowerShell, dentro de `front`:
 
-    npm install
-    npm run dev
+```powershell
+npm install
+npm run dev
+```
 
-Por padrão, o dashboard consome a API publicada no Render. Para usar uma API local, crie um arquivo `front/.env` com:
+Por padrão, o dashboard usa a API do Render. Para usar a API local, crie `front/.env`:
 
-    VITE_API_URL=http://127.0.0.1:8000
+```env
+VITE_API_URL=http://127.0.0.1:8000
+```
 
-O dashboard apresenta as leituras atuais, gráficos de temperatura e umidade, histórico recente, status da estação e estados de erro/carregamento.
+Para gerar a versão de produção:
 
-## Publicação no Render
-
-O arquivo `render.yaml` deixa os dois serviços configurados no mesmo Blueprint:
-
-- `meteo-api`: Web Service Python, com raiz em `back/api`.
-- `meteo-dashboard`: Static Site, com raiz em `front` e publicação de `dist`.
-
-No Render, use **New > Blueprint**, conecte este repositório e selecione a branch `main`. O Render lerá o `render.yaml`, criará os dois serviços e fará novos deploys a cada push nessa branch. Depois do primeiro deploy, confirme a URL final da API e atualize `VITE_API_URL` no serviço do dashboard caso o nome gerado seja diferente.
+```powershell
+npm run build
+```
 
 ## Testes
 
 Dentro de `back/api`:
 
 ```powershell
-    python -m unittest -v
+python -m unittest -v
 ```
 
----
+Os testes cobrem a aceitação de medições válidas, conversão de horário, rejeição de umidade impossível e inicialização do banco SQLite.
 
-## Situação atual frente ao manual do PD-II
+## Publicação no Render
 
-| Exigência do PD-II | Status |
+### API existente
+
+A API está configurada como **Web Service**:
+
+| Campo | Valor |
 |---|---|
-| ESP32 | ✅ Validado em simulação (Cirkit Designer), pendente hardware físico |
-| Sensores ambientais | ⚠️ Dados de teste fixos no firmware; falta integrar sensores reais (DHT22, BMP280, MQ-135, LDR, pluviômetro) |
-| Comunicação com servidor | ✅ HTTP/HTTPS funcionando ponta a ponta |
-| Backend em Python | ✅ `server.py`, publicado em produção |
-| API para receber dados | ✅ `POST /api/v1/measurements` |
-| Banco de dados | ✅ SQLite (local) — atenção à persistência em produção (ver seção de deploy) |
-| Validação dos dados | ✅ Faixas de valores e validação ISO 8601 |
-| Consulta dos dados | ✅ Endpoints GET |
-| Estações meteorológicas | ✅ `/api/v1/stations` |
-| Última medição | ✅ `/latest` |
-| Dashboard | ⚠️ Ainda precisa ser desenvolvido |
-| MQTT | ⚠️ Ainda não implementado (exigido pelo manual na etapa de firmware) |
-| Geolocalização | ✅ Latitude/longitude já existem no modelo |
-| Testes | ✅ `test_server.py` |
-| Integração final | ⚠️ Falta juntar sensores reais + MQTT + dashboard |
+| Root Directory | `back/api` |
+| Build Command | `pip install -r requirements.txt` |
+| Start Command | `python server.py` |
+| Health Check Path | `/health` |
 
----
+### Frontend
 
-## Próximas integrações
+O frontend deve ser publicado como **Static Site** no mesmo workspace do Render:
 
-- **Sensores reais**: substituir os valores fixos de teste no firmware por leituras de DHT22, BMP280, MQ-135, LDR e pluviômetro.
-- **MQTT**: implementar a etapa de firmware conforme exigido pelo manual (`ESP32 → MQTT → Broker → Backend Python`), mantendo a API REST atual para o consumo do dashboard.
-- **Dashboard**: consumir `/latest` para cartões de status e `/api/v1/measurements` para gráficos históricos.
-- **Segurança**: antes de uma publicação definitiva, adicionar uma chave de API por estação.
-- **Persistência**: avaliar Render Disk ou migração para PostgreSQL se o volume de leituras crescer ou se a persistência entre deploys for necessária para a apresentação final.
+| Campo | Valor |
+|---|---|
+| Branch | `main` |
+| Root Directory | `front` |
+| Build Command | `npm install && npm run build` |
+| Publish Directory | `dist` |
+| Environment Variable | `VITE_API_URL=https://projeto-desenvolvimento-ii.onrender.com` |
+
+O arquivo `render.yaml` contém uma configuração de Blueprint para os dois serviços. Como a API já existe, a publicação manual do Static Site evita criar uma segunda API e duplicar o armazenamento.
+
+O plano gratuito do Render pode suspender serviços após um período de inatividade. A primeira requisição depois disso pode levar alguns segundos. O SQLite também utiliza disco efêmero no plano gratuito; os dados não são permanentes após reinicializações ou novos deploys.
+
+## Integração com ESP32
+
+O firmware em `back/firmware/ESP32.cpp` conecta o ESP32 ao Wi-Fi e envia as medições para:
+
+```text
+https://projeto-desenvolvimento-ii.onrender.com/api/v1/measurements
+```
+
+A comunicação foi validada com um ESP32-S3 simulado no Cirkit Designer, utilizando a rede virtual `CirkitWifi`. Os valores atuais do firmware ainda são fixos para teste; a integração com os sensores físicos será feita em uma etapa posterior.
+
+## Situação atual
+
+| Item | Status |
+|---|---|
+| Organização em backend e frontend | ✅ Concluída |
+| Comunicação ESP32 → API | ✅ Validada em simulação |
+| API Python | ✅ Publicada |
+| Validação de medições | ✅ Implementada |
+| Banco SQLite | ✅ Implementado |
+| Dashboard React | ✅ Implementado |
+| Histórico e gráficos | ✅ Implementados |
+| Sensores físicos | ⚠️ Próxima etapa |
+| MQTT | ⚠️ Ainda não implementado |
+| Persistência definitiva | ⚠️ Avaliar PostgreSQL ou Render Disk |
+
+## Próximas etapas
+
+- Integrar DHT22, BMP280, MQ-135, LDR e pluviômetro reais.
+- Implementar o fluxo `ESP32 → MQTT → broker → backend`.
+- Adicionar autenticação ou chave de API por estação.
+- Avaliar PostgreSQL para manter as medições em produção.
+- Adicionar filtros de período e análises mais detalhadas no histórico.
+
+## Documentação complementar
+
+- [Guia de publicação do frontend no Render](Guia_publicacao_frontend_Render.docx)
+- [Relatório acadêmico do projeto](Relatorio_Projeto_Desenvolvimento_II_MeteoCidade.docx)
+
+## Créditos
+
+Projeto acadêmico desenvolvido para o **Projeto Desenvolvimento II - UNIP**.
